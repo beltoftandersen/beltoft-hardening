@@ -4,20 +4,21 @@ Tags: security, hardening, user enumeration, login, rest api
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Closes the routes that reveal an administrator's login name, makes login failures uniform, and keeps administrators on wp-login.php.
+Hides administrator login names from user routes, oEmbed and REST, makes login errors uniform, and keeps administrators on wp-login.php.
 
 == Description ==
 
-Four small controls, each a checkbox under Settings > Hardening and all on by default:
+Five small controls, each a checkbox under Settings > Hardening and all on by default:
 
 * **REST user routes**: `/wp/v2/users` is hidden from everyone who cannot list users.
 * **Author archives**: `/?author=1` and author archives answer 404 on the front end.
 * **Login errors**: one message for a wrong username, email or password.
 * **Administrator sign-in**: accounts that can manage the site sign in at wp-login.php only.
+* **Author details**: the author name and URL are dropped from oEmbed replies, and the author field and link from public REST posts and pages, for everyone who cannot edit posts.
 
 An optional text field replaces the default message "Incorrect username or password.".
 
@@ -46,11 +47,18 @@ WordPress says whether the user exists or only the password is wrong, which lets
 
 Two-factor plugins build their second step around wp-login.php. A front-end login form, such as the WooCommerce My Account form, would let an administrator in without it. Customers are not affected. Cookie sessions, application passwords over REST and WP-CLI are not affected either.
 
+= Why hide author details from oEmbed and the REST API? =
+
+The oEmbed reply includes the author's name and the URL of the author archive, which is built from the login name. Public posts and pages in the REST API include the author's user ID. Editors still see both, because the block editor needs them. The site name stays in the oEmbed reply.
+
 = Can I change which accounts count as administrators? =
 
-Yes, with the `beltoft_hardening_admin_capability` filter (default `manage_options`). Other filters: `beltoft_hardening_hidden_rest_routes`, `beltoft_hardening_block_author_request`, `beltoft_hardening_credential_error_codes`, `beltoft_hardening_generic_message` and `beltoft_hardening_admin_login_allowed`.
+Yes, with the `beltoft_hardening_admin_capability` filter (default `manage_options`). Other filters: `beltoft_hardening_author_details_capability`, `beltoft_hardening_hidden_rest_routes`, `beltoft_hardening_block_author_request`, `beltoft_hardening_credential_error_codes`, `beltoft_hardening_generic_message` and `beltoft_hardening_admin_login_allowed`.
 
 == Changelog ==
+
+= 1.2.0 =
+* New control: hide author details from oEmbed and the public REST API. The oEmbed author name and URL and the REST author field and link are removed for anyone who cannot edit posts. On by default. Filter `beltoft_hardening_author_details_capability`.
 
 = 1.1.0 =
 * Now a standalone plugin with a settings screen (Settings > Hardening), every control a checkbox, all on by default, and an optional custom login message.

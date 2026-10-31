@@ -20,6 +20,7 @@ final class Settings {
 	public const AUTHOR_ARCHIVES = 'author_archives';
 	public const UNIFORM_ERRORS  = 'uniform_errors';
 	public const ADMIN_LOGIN     = 'admin_login';
+	public const AUTHOR_DETAILS  = 'author_details';
 	public const MESSAGE         = 'message';
 
 	/**
@@ -28,7 +29,7 @@ final class Settings {
 	 * @return string[]
 	 */
 	public static function toggles(): array {
-		return array( self::REST_USERS, self::AUTHOR_ARCHIVES, self::UNIFORM_ERRORS, self::ADMIN_LOGIN );
+		return array( self::REST_USERS, self::AUTHOR_ARCHIVES, self::UNIFORM_ERRORS, self::ADMIN_LOGIN, self::AUTHOR_DETAILS );
 	}
 
 	/**

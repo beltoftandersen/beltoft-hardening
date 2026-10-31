@@ -18,6 +18,7 @@ final class SettingsTest extends TestCase {
 		$this->assertSame( 0, $out[ Settings::AUTHOR_ARCHIVES ] );
 		$this->assertSame( 0, $out[ Settings::UNIFORM_ERRORS ] );
 		$this->assertSame( 0, $out[ Settings::ADMIN_LOGIN ] );
+		$this->assertSame( 0, $out[ Settings::AUTHOR_DETAILS ] );
 		$this->assertSame( '', $out[ Settings::MESSAGE ] );
 	}
 

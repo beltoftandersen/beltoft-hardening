@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Beltoft Hardening
  * Plugin URI:        https://beltoft.net/
- * Description:       Closes the user-enumeration routes an attacker uses to learn an administrator's login name, makes login failures uniform, and keeps administrators on wp-login.php.
- * Version:           1.1.0
+ * Description:       Closes the user-enumeration routes an attacker uses to learn an administrator's login name, makes login failures uniform, keeps administrators on wp-login.php, and hides author details from oEmbed and the public REST API.
+ * Version:           1.2.0
  * Requires at least: 6.5
  * Requires PHP:      8.0
  * Author:            beltoft.net
@@ -33,6 +33,11 @@
  * site are an unpatched plugin or a guessed administrator password, so the login is the half worth
  * defending.
  *
+ * Two more places repeat it once those are closed: the oEmbed reply carries author_name and
+ * author_url (/author/login-name/), and every public post and page in the REST API carries an
+ * author ID and a link to /wp/v2/users/ID. AuthorDetails removes both for anyone who cannot edit
+ * posts.
+ *
  * Deliberately NOT done here: hiding wp-login.php behind a secret path. It breaks password resets
  * and integrations, and anyone who can read a Set-Cookie path or a redirect finds it anyway - it
  * buys obscurity, not security. Rate limiting (for example nginx `limit_req`) plus fail2ban plus a
@@ -47,7 +52,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'BELTOFT_HARDENING_FILE', __FILE__ );
 define( 'BELTOFT_HARDENING_PATH', plugin_dir_path( __FILE__ ) );
-define( 'BELTOFT_HARDENING_VERSION', '1.1.0' );
+define( 'BELTOFT_HARDENING_VERSION', '1.2.0' );
 
 spl_autoload_register(
 	static function ( $class_name ) {

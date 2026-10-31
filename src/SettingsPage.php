@@ -85,6 +85,10 @@ final class SettingsPage {
 				__( 'Administrator sign-in', 'beltoft-hardening' ),
 				__( 'Administrators can only sign in at wp-login.php', 'beltoft-hardening' ),
 			),
+			Settings::AUTHOR_DETAILS  => array(
+				__( 'Author details', 'beltoft-hardening' ),
+				__( 'Hide author details from oEmbed and the public REST API', 'beltoft-hardening' ),
+			),
 		);
 
 		foreach ( $boxes as $key => $labels ) {

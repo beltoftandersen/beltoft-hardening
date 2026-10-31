@@ -35,6 +35,7 @@ final class Plugin {
 		AuthorArchives::register();
 		LoginErrors::register();
 		AdminLogin::register();
+		AuthorDetails::register();
 		SettingsPage::register();
 	}
 }
