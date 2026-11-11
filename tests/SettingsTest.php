@@ -25,7 +25,7 @@ final class SettingsTest extends TestCase {
 	public function test_sanitize_message_and_garbage(): void {
 		$out = Settings::sanitize( array( Settings::MESSAGE => "  <script>x</script>Bad\n login " ) );
 		$this->assertStringNotContainsString( '<', $out[ Settings::MESSAGE ] );
-		$this->assertSame( array(), array_diff( array_keys( Settings::sanitize( 'junk' ) ), array_merge( Settings::toggles(), array( Settings::MESSAGE ) ) ) );
+		$this->assertSame( array(), array_diff( array_keys( Settings::sanitize( 'junk' ) ), array_merge( Settings::toggles(), array( Settings::MESSAGE, Settings::HIDE_LOGIN, Settings::ENTRY_SLUG, Settings::PUBLIC_LOGIN_URL, Settings::ALLOW_LOSTPASSWORD ) ) ) );
 		$this->assertSame( 0, Settings::sanitize( array( 'evil' => 1 ) )[ Settings::REST_USERS ] );
 		$this->assertArrayNotHasKey( 'evil', Settings::sanitize( array( 'evil' => 1 ) ) );
 	}

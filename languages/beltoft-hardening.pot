@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Beltoft Hardening 1.2.0\n"
+"Project-Id-Version: Beltoft Hardening 1.3.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/beltoft-hardening\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-11-09T08:48:14+00:00\n"
+"POT-Creation-Date: 2026-11-11T11:09:06+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: beltoft-hardening\n"
@@ -26,7 +26,7 @@ msgstr ""
 
 #. Description of the plugin
 #: beltoft-hardening.php
-msgid "Closes the user-enumeration routes an attacker uses to learn an administrator's login name, makes login failures uniform, keeps administrators on wp-login.php, and hides author details from oEmbed and the public REST API."
+msgid "Closes the user-enumeration routes an attacker uses to learn an administrator's login name, makes login failures uniform, keeps administrators on wp-login.php, hides author details from oEmbed and the public REST API, and can answer 404 to visitors who ask for the login screen or the admin area."
 msgstr ""
 
 #. Author of the plugin
@@ -39,15 +39,47 @@ msgstr ""
 msgid "https://beltoft.net"
 msgstr ""
 
+#: src/AdminLogin.php:121
+msgid "Administrators sign in through the staff sign-in address."
+msgstr ""
+
 #. translators: %s: link to the WordPress login page.
-#: src/AdminLogin.php:124
+#: src/AdminLogin.php:129
 #, php-format
 msgid "Administrators sign in at the <a href=\"%s\">WordPress login</a>."
 msgstr ""
 
-#: src/Settings.php:56
-#: src/SettingsPage.php:144
+#: src/HideLogin.php:71
+msgid "Switched off by the BELTOFT_HARDENING_DISABLE_HIDE_LOGIN constant in wp-config.php."
+msgstr ""
+
+#: src/HideLogin.php:74
+msgid "Not supported on a multisite network, so it stays off."
+msgstr ""
+
+#: src/Settings.php:135
+#: src/SettingsPage.php:227
 msgid "Incorrect username or password."
+msgstr ""
+
+#: src/Settings.php:185
+msgid "Hiding the login screen is not supported on a multisite network."
+msgstr ""
+
+#: src/Settings.php:189
+msgid "The control was left off."
+msgstr ""
+
+#: src/Settings.php:191
+msgid "A page or post already uses this address. The staff sign-in address takes precedence, so that page can no longer be reached. Choose another address if you need it."
+msgstr ""
+
+#: src/Settings.php:210
+msgid "Enter a staff sign-in address first, otherwise nobody could sign in."
+msgstr ""
+
+#: src/Settings.php:213
+msgid "The staff sign-in address cannot start with \"wp-\"."
 msgstr ""
 
 #: src/SettingsPage.php:33
@@ -99,10 +131,62 @@ msgstr ""
 msgid "Hide author details from oEmbed and the public REST API"
 msgstr ""
 
+#: src/SettingsPage.php:108
+msgid "Hide the login"
+msgstr ""
+
+#: src/SettingsPage.php:109
+msgid "Staff sign-in address"
+msgstr ""
+
 #: src/SettingsPage.php:110
+msgid "Public sign-in address"
+msgstr ""
+
+#: src/SettingsPage.php:111
+msgid "Lost-password screen"
+msgstr ""
+
+#: src/SettingsPage.php:115
 msgid "Login error text"
 msgstr ""
 
-#: src/SettingsPage.php:146
+#: src/SettingsPage.php:157
+msgid "Visitors who are not signed in get a 404 for the login screen and the admin area"
+msgstr ""
+
+#: src/SettingsPage.php:164
+msgid "Staff sign-in address:"
+msgstr ""
+
+#: src/SettingsPage.php:167
+msgid "Warning: save the staff sign-in address somewhere safe before switching this on. If you lose it, add define( 'BELTOFT_HARDENING_DISABLE_HIDE_LOGIN', true ); to wp-config.php to get the normal login back."
+msgstr ""
+
+#: src/SettingsPage.php:180
+msgid "Letters, digits and hyphens. Visiting this address sets a 15-minute cookie and opens the login. It must be filled in before the control can be switched on, and it must not be the address of an existing page."
+msgstr ""
+
+#: src/SettingsPage.php:194
+msgid "Where \"Log in\" links WordPress prints are sent for visitors. Empty: the My Account page when WooCommerce is active, otherwise the home page."
+msgstr ""
+
+#: src/SettingsPage.php:206
+msgid "Automatic (on without WooCommerce, off with it)"
+msgstr ""
+
+#: src/SettingsPage.php:207
+msgid "Allow the wp-login.php lost-password screen"
+msgstr ""
+
+#: src/SettingsPage.php:208
+msgid "Hide it as well"
+msgstr ""
+
+#: src/SettingsPage.php:212
+msgid "Only used while the login is hidden. WooCommerce has its own lost-password screen on My Account."
+msgstr ""
+
+#: src/SettingsPage.php:229
 msgid "Leave empty to use the default text."
 msgstr ""

@@ -105,6 +105,11 @@ final class SettingsPage {
 			);
 		}
 
+		add_settings_field( 'beltoft_hardening_hide_login', __( 'Hide the login', 'beltoft-hardening' ), array( __CLASS__, 'hide_login_field' ), self::PAGE, 'beltoft_hardening_main' );
+		add_settings_field( 'beltoft_hardening_entry_slug', __( 'Staff sign-in address', 'beltoft-hardening' ), array( __CLASS__, 'slug_field' ), self::PAGE, 'beltoft_hardening_main' );
+		add_settings_field( 'beltoft_hardening_public_login_url', __( 'Public sign-in address', 'beltoft-hardening' ), array( __CLASS__, 'public_url_field' ), self::PAGE, 'beltoft_hardening_main' );
+		add_settings_field( 'beltoft_hardening_allow_lostpassword', __( 'Lost-password screen', 'beltoft-hardening' ), array( __CLASS__, 'lostpassword_field' ), self::PAGE, 'beltoft_hardening_main' );
+
 		add_settings_field(
 			'beltoft_hardening_message',
 			__( 'Login error text', 'beltoft-hardening' ),
@@ -127,6 +132,84 @@ final class SettingsPage {
 			checked( Settings::enabled( $args['key'] ), true, false ),
 			esc_html( $args['desc'] )
 		);
+	}
+
+	/**
+	 * Saved value of one of the hide-login fields.
+	 *
+	 * @param string $key Settings key.
+	 */
+	private static function saved( string $key ): string {
+		$saved = get_option( Settings::OPTION, array() );
+
+		return is_array( $saved ) && isset( $saved[ $key ] ) ? (string) $saved[ $key ] : '';
+	}
+
+	/**
+	 * The hide-login checkbox, its state and the warning. Off by default.
+	 */
+	public static function hide_login_field(): void {
+		printf(
+			'<label><input type="checkbox" name="%1$s[%2$s]" value="1" %3$s /> %4$s</label>',
+			esc_attr( Settings::OPTION ),
+			esc_attr( Settings::HIDE_LOGIN ),
+			checked( Settings::hide_login_enabled(), true, false ),
+			esc_html__( 'Visitors who are not signed in get a 404 for the login screen and the admin area', 'beltoft-hardening' )
+		);
+
+		$reason = HideLogin::disabled_reason();
+		if ( Settings::hide_login_enabled() && '' !== $reason ) {
+			echo '<p class="description"><strong>' . esc_html( $reason ) . '</strong></p>';
+		} elseif ( HideLogin::active() ) {
+			echo '<p class="description"><strong>' . esc_html__( 'Staff sign-in address:', 'beltoft-hardening' ) . '</strong> <code>' . esc_html( home_url( '/' . Settings::entry_slug() . '/' ) ) . '</code></p>';
+		}
+
+		echo '<p class="description">' . esc_html__( 'Warning: save the staff sign-in address somewhere safe before switching this on. If you lose it, add define( \'BELTOFT_HARDENING_DISABLE_HIDE_LOGIN\', true ); to wp-config.php to get the normal login back.', 'beltoft-hardening' ) . '</p>';
+	}
+
+	/**
+	 * The staff sign-in address field.
+	 */
+	public static function slug_field(): void {
+		printf(
+			'<code>%1$s</code> <input type="text" class="regular-text" name="%2$s[%3$s]" value="%4$s" /><p class="description">%5$s</p>',
+			esc_html( trailingslashit( home_url() ) ),
+			esc_attr( Settings::OPTION ),
+			esc_attr( Settings::ENTRY_SLUG ),
+			esc_attr( self::saved( Settings::ENTRY_SLUG ) ),
+			esc_html__( 'Letters, digits and hyphens. Visiting this address sets a 15-minute cookie and opens the login. It must be filled in before the control can be switched on, and it must not be the address of an existing page.', 'beltoft-hardening' )
+		);
+	}
+
+	/**
+	 * The public sign-in address field.
+	 */
+	public static function public_url_field(): void {
+		printf(
+			'<input type="url" class="regular-text" name="%1$s[%2$s]" value="%3$s" placeholder="%4$s" /><p class="description">%5$s</p>',
+			esc_attr( Settings::OPTION ),
+			esc_attr( Settings::PUBLIC_LOGIN_URL ),
+			esc_attr( self::saved( Settings::PUBLIC_LOGIN_URL ) ),
+			esc_attr( Settings::public_login_url() ),
+			esc_html__( 'Where "Log in" links WordPress prints are sent for visitors. Empty: the My Account page when WooCommerce is active, otherwise the home page.', 'beltoft-hardening' )
+		);
+	}
+
+	/**
+	 * The lost-password select.
+	 */
+	public static function lostpassword_field(): void {
+		$value = self::saved( Settings::ALLOW_LOSTPASSWORD );
+
+		printf( '<select name="%1$s[%2$s]">', esc_attr( Settings::OPTION ), esc_attr( Settings::ALLOW_LOSTPASSWORD ) );
+		foreach ( array(
+			''  => __( 'Automatic (on without WooCommerce, off with it)', 'beltoft-hardening' ),
+			'1' => __( 'Allow the wp-login.php lost-password screen', 'beltoft-hardening' ),
+			'0' => __( 'Hide it as well', 'beltoft-hardening' ),
+		) as $key => $label ) {
+			printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( (string) $key ), selected( $value, (string) $key, false ), esc_html( $label ) );
+		}
+		echo '</select><p class="description">' . esc_html__( 'Only used while the login is hidden. WooCommerce has its own lost-password screen on My Account.', 'beltoft-hardening' ) . '</p>';
 	}
 
 	/**

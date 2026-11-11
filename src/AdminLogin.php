@@ -116,6 +116,11 @@ final class AdminLogin {
 			return $user;
 		}
 
+		// With the login screen hidden, a link to it would point a customer at a 404 and name the way in: no link.
+		if ( HideLogin::active() ) {
+			return new \WP_Error( 'beltoft_hardening_admin_login_location', esc_html__( 'Administrators sign in through the staff sign-in address.', 'beltoft-hardening' ) );
+		}
+
 		return new \WP_Error(
 			'beltoft_hardening_admin_login_location',
 			wp_kses(

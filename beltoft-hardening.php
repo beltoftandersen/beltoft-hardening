@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Beltoft Hardening
  * Plugin URI:        https://beltoft.net/
- * Description:       Closes the user-enumeration routes an attacker uses to learn an administrator's login name, makes login failures uniform, keeps administrators on wp-login.php, and hides author details from oEmbed and the public REST API.
- * Version:           1.2.0
+ * Description:       Closes the user-enumeration routes an attacker uses to learn an administrator's login name, makes login failures uniform, keeps administrators on wp-login.php, hides author details from oEmbed and the public REST API, and can answer 404 to visitors who ask for the login screen or the admin area.
+ * Version:           1.3.0
  * Requires at least: 6.5
  * Requires PHP:      8.0
  * Author:            beltoft.net
@@ -38,10 +38,10 @@
  * author ID and a link to /wp/v2/users/ID. AuthorDetails removes both for anyone who cannot edit
  * posts.
  *
- * Deliberately NOT done here: hiding wp-login.php behind a secret path. It breaks password resets
- * and integrations, and anyone who can read a Set-Cookie path or a redirect finds it anyway - it
- * buys obscurity, not security. Rate limiting (for example nginx `limit_req`) plus fail2ban plus a
- * second factor are the controls that actually hold. This plugin complements them.
+ * Optional sixth control (off by default): HideLogin answers 404 to a visitor who is not signed in when they ask for
+ * wp-login.php or wp-admin. It is not a secret path: the staff entry address is guessable, and rate limiting (for
+ * example nginx `limit_req`), fail2ban and a second factor are what hold against a determined attacker. What it gives is
+ * no login form and no password endpoint for the public, and far less noise in the logs.
  *
  * Every control can be switched off under Settings > Hardening.
  *
@@ -52,7 +52,7 @@ defined( 'ABSPATH' ) || exit;
 
 define( 'BELTOFT_HARDENING_FILE', __FILE__ );
 define( 'BELTOFT_HARDENING_PATH', plugin_dir_path( __FILE__ ) );
-define( 'BELTOFT_HARDENING_VERSION', '1.2.0' );
+define( 'BELTOFT_HARDENING_VERSION', '1.3.0' );
 
 spl_autoload_register(
 	static function ( $class_name ) {
