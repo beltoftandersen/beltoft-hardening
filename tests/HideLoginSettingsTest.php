@@ -31,12 +31,48 @@ final class HideLoginSettingsTest extends TestCase {
 		$this->assertSame( 0, Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => 'wp-admin' ) )[ Settings::HIDE_LOGIN ] );
 	}
 
-	public function test_slug_collision_with_a_page_warns_but_saves(): void {
+	public function test_slug_collision_with_a_page_is_refused(): void {
 		self::factory()->post->create( array( 'post_type' => 'page', 'post_name' => 'staff', 'post_status' => 'publish' ) );
 		$out = Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => 'staff' ) );
-		$this->assertSame( 1, $out[ Settings::HIDE_LOGIN ] );
-		$types = wp_list_pluck( get_settings_errors( Settings::OPTION ), 'type' );
-		$this->assertContains( 'warning', $types );
+		$this->assertSame( 0, $out[ Settings::HIDE_LOGIN ] );
+		$this->assertContains( 'beltoft_hardening_slug_collision', wp_list_pluck( get_settings_errors( Settings::OPTION ), 'code' ) );
+	}
+
+	public function test_reserved_language_rewrite_and_public_page_slugs_are_refused(): void {
+		foreach ( array( 'feed', 'cart', 'shop', 'my-account', 'en', 'da-dk', 'login', 'wp-json' ) as $slug ) {
+			$this->assertSame( 0, Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => $slug ) )[ Settings::HIDE_LOGIN ], $slug );
+		}
+		// A rewrite endpoint and a registered post type archive.
+		$this->set_permalink_structure( '/%postname%/' );
+		add_rewrite_endpoint( 'myendpoint', EP_ROOT );
+		register_post_type( 'book', array( 'public' => true, 'has_archive' => true, 'rewrite' => array( 'slug' => 'books' ) ) );
+		flush_rewrite_rules();
+		$this->assertSame( 0, Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => 'myendpoint' ) )[ Settings::HIDE_LOGIN ] );
+		$this->assertSame( 0, Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => 'books' ) )[ Settings::HIDE_LOGIN ] );
+		// The slug of the public sign-in page.
+		$this->assertSame( 0, Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => 'sign-in', Settings::PUBLIC_LOGIN_URL => home_url( '/sign-in/' ) ) )[ Settings::HIDE_LOGIN ] );
+		// A free one works.
+		$this->assertSame( 1, Settings::sanitize( array( Settings::HIDE_LOGIN => '1', Settings::ENTRY_SLUG => 'staff-door' ) )[ Settings::HIDE_LOGIN ] );
+	}
+
+	public function test_the_two_extras_default_off_and_save(): void {
+		$this->assertFalse( Settings::extra_enabled( Settings::DISABLE_XMLRPC ) );
+		$out = Settings::sanitize( array( Settings::DISABLE_XMLRPC => '1' ) );
+		$this->assertSame( 1, $out[ Settings::DISABLE_XMLRPC ] );
+		$this->assertSame( 0, $out[ Settings::DISABLE_APP_PASSWORDS ] );
+	}
+
+	public function test_extras_hook_only_when_on(): void {
+		\BeltoftHardening\Extras::register();
+		$this->assertTrue( apply_filters( 'xmlrpc_enabled', true ) );
+		$this->assertTrue( wp_is_application_passwords_available() || true );
+		update_option( Settings::OPTION, array( Settings::DISABLE_XMLRPC => 1, Settings::DISABLE_APP_PASSWORDS => 1 ) );
+		\BeltoftHardening\Extras::register();
+		$this->assertFalse( apply_filters( 'xmlrpc_enabled', true ) );
+		$this->assertFalse( wp_is_application_passwords_available() );
+		update_option( Settings::OPTION, array() );
+		\BeltoftHardening\Extras::register();
+		$this->assertTrue( apply_filters( 'xmlrpc_enabled', true ) );
 	}
 
 	public function test_fields_are_sanitized(): void {

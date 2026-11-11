@@ -45,7 +45,8 @@ final class EntryCookie {
 	 * @param int $expiry Unix time.
 	 */
 	public static function sign( int $expiry ): string {
-		return hash_hmac( 'sha256', 'beltoft-hardening-entry|' . $expiry, wp_salt( 'auth' ) );
+		// Bound to this site and this purpose, so sites that share salts do not share cookies.
+		return hash_hmac( 'sha256', 'beltoft-hardening-entry|' . home_url() . '|' . $expiry, wp_salt( 'auth' ) );
 	}
 
 	/**
@@ -65,7 +66,7 @@ final class EntryCookie {
 	 * @param mixed $value Raw cookie value.
 	 */
 	public static function check( $value ): bool {
-		if ( ! is_string( $value ) || ! preg_match( '/^(\d{9,11})\.([a-f0-9]{64})$/', $value, $m ) ) {
+		if ( ! is_string( $value ) || ! preg_match( '/^(\d{9,11})\.([a-f0-9]{64})\z/', $value, $m ) ) {
 			return false;
 		}
 

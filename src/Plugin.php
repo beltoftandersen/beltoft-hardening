@@ -36,6 +36,7 @@ final class Plugin {
 		LoginErrors::register();
 		AdminLogin::register();
 		HideLogin::register();
+		Extras::register();
 		AuthorDetails::register();
 		SettingsPage::register();
 	}

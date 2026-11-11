@@ -29,6 +29,10 @@ final class Settings {
 	public const PUBLIC_LOGIN_URL  = 'public_login_url';
 	public const ALLOW_LOSTPASSWORD = 'allow_lostpassword';
 
+	// Optional extras, off by default.
+	public const DISABLE_XMLRPC       = 'disable_xmlrpc';
+	public const DISABLE_APP_PASSWORDS = 'disable_app_passwords';
+
 	/**
 	 * The checkbox keys. All default to on.
 	 *
@@ -36,6 +40,17 @@ final class Settings {
 	 */
 	public static function toggles(): array {
 		return array( self::REST_USERS, self::AUTHOR_ARCHIVES, self::UNIFORM_ERRORS, self::ADMIN_LOGIN, self::AUTHOR_DETAILS );
+	}
+
+	/**
+	 * Whether one of the optional, default-off extras is on.
+	 *
+	 * @param string $key DISABLE_XMLRPC or DISABLE_APP_PASSWORDS.
+	 */
+	public static function extra_enabled( string $key ): bool {
+		$saved = get_option( self::OPTION, array() );
+
+		return is_array( $saved ) && ! empty( $saved[ $key ] );
 	}
 
 	/**
@@ -163,6 +178,9 @@ final class Settings {
 
 		$clean = array_merge( $clean, self::sanitize_hide_login( $input ) );
 
+		$clean[ self::DISABLE_XMLRPC ]        = empty( $input[ self::DISABLE_XMLRPC ] ) ? 0 : 1;
+		$clean[ self::DISABLE_APP_PASSWORDS ] = empty( $input[ self::DISABLE_APP_PASSWORDS ] ) ? 0 : 1;
+
 		return $clean;
 	}
 
@@ -187,8 +205,12 @@ final class Settings {
 			if ( '' !== $problem ) {
 				$on = false;
 				self::notice( 'beltoft_hardening_hide_login', $problem . ' ' . __( 'The control was left off.', 'beltoft-hardening' ), 'error' );
-			} elseif ( self::slug_collides( $slug ) ) {
-				self::notice( 'beltoft_hardening_slug_collision', __( 'A page or post already uses this address. The staff sign-in address takes precedence, so that page can no longer be reached. Choose another address if you need it.', 'beltoft-hardening' ), 'warning' );
+			} else {
+				$problem = self::slug_conflict( $slug, $url );
+				if ( '' !== $problem ) {
+					$on = false;
+					self::notice( 'beltoft_hardening_slug_collision', $problem . ' ' . __( 'The control was left off.', 'beltoft-hardening' ), 'error' );
+				}
 			}
 		}
 
@@ -201,7 +223,7 @@ final class Settings {
 	}
 
 	/**
-	 * Why a slug cannot be used, or an empty string.
+	 * Why a slug cannot be used, judged from the slug alone (cheap, runs on every request), or an empty string.
 	 *
 	 * @param string $slug Cleaned slug.
 	 */
@@ -211,6 +233,63 @@ final class Settings {
 		}
 		if ( 0 === strpos( $slug, 'wp-' ) ) {
 			return __( 'The staff sign-in address cannot start with "wp-".', 'beltoft-hardening' );
+		}
+		if ( in_array( $slug, array( 'feed', 'login', 'admin', 'dashboard', 'cart', 'checkout', 'shop', 'my-account', 'index', 'sitemap', 'robots', 'embed', 'comments' ), true ) ) {
+			return __( 'That address is used by WordPress or WooCommerce.', 'beltoft-hardening' );
+		}
+		if ( preg_match( '/^[a-z]{2}(-[a-z]{2})?$/', $slug ) ) {
+			return __( 'An address that looks like a language prefix would clash with translation plugins.', 'beltoft-hardening' );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Why a slug clashes with the site's own content, checked when the settings are saved: a page, post or other
+	 * public content at that path, a rewrite rule or endpoint, a WooCommerce page, or the public sign-in page.
+	 *
+	 * @param string $slug       Cleaned slug.
+	 * @param string $public_url The public sign-in address being saved (default: the saved one).
+	 */
+	public static function slug_conflict( string $slug, string $public_url = '' ): string {
+		$msg = __( 'A page, post, WooCommerce page or rewrite rule already uses this address.', 'beltoft-hardening' );
+
+		if ( self::slug_collides( $slug ) ) {
+			return $msg;
+		}
+
+		global $wp_rewrite;
+		if ( $wp_rewrite instanceof \WP_Rewrite ) {
+			if ( in_array( $slug, array_map( 'strtolower', wp_list_pluck( (array) $wp_rewrite->endpoints, 1 ) ), true ) ) {
+				return $msg;
+			}
+			foreach ( (array) $wp_rewrite->wp_rewrite_rules() as $regex => $query ) {
+				// The catch-all page and post rules match every path; only specific rules are a clash.
+				if ( false !== strpos( (string) $query, 'pagename=' ) || false !== strpos( (string) $query, 'attachment=' ) || false !== strpos( (string) $query, 'name=' ) ) {
+					continue;
+				}
+				if ( @preg_match( '#^' . $regex . '#', $slug . '/' ) || @preg_match( '#^' . $regex . '#', $slug ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- rules are not all valid on their own.
+					return $msg;
+				}
+			}
+		}
+
+		if ( function_exists( 'wc_get_page_id' ) ) {
+			foreach ( array( 'myaccount', 'shop', 'cart', 'checkout' ) as $page ) {
+				$id = (int) wc_get_page_id( $page );
+				if ( $id > 0 && get_post_field( 'post_name', $id ) === $slug ) {
+					return $msg;
+				}
+			}
+		}
+
+		$public = trim( (string) wp_parse_url( '' !== $public_url ? $public_url : self::public_login_url(), PHP_URL_PATH ), '/' );
+		$base   = trim( (string) wp_parse_url( home_url(), PHP_URL_PATH ), '/' );
+		if ( '' !== $base && 0 === strpos( $public, $base . '/' ) ) {
+			$public = substr( $public, strlen( $base ) + 1 );
+		}
+		if ( $public === $slug ) {
+			return __( 'The staff sign-in address cannot be the public sign-in page.', 'beltoft-hardening' );
 		}
 
 		return '';

@@ -41,7 +41,7 @@
  * Optional sixth control (off by default): HideLogin answers 404 to a visitor who is not signed in when they ask for
  * wp-login.php or wp-admin. It is not a secret path: the staff entry address is guessable, and rate limiting (for
  * example nginx `limit_req`), fail2ban and a second factor are what hold against a determined attacker. What it gives is
- * no login form and no password endpoint for the public, and far less noise in the logs.
+ * no wp-login.php form and no wp-login.php password endpoint for the public, and far less noise in the logs. XML-RPC, REST application passwords and the shop's own login form remain password endpoints; two optional controls switch off the first two.
  *
  * Every control can be switched off under Settings > Hardening.
  *
@@ -81,5 +81,8 @@ function beltoft_hardening_load_textdomain() {
 	load_plugin_textdomain( 'beltoft-hardening', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 }
 add_action( 'init', 'beltoft_hardening_load_textdomain', 0 );
+
+// Before the plugins that sort after this one load: lets an anonymous wp-admin request be treated as front end.
+\BeltoftHardening\HideLogin::early();
 
 add_action( 'plugins_loaded', array( \BeltoftHardening\Plugin::class, 'boot' ) );

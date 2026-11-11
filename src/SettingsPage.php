@@ -110,6 +110,13 @@ final class SettingsPage {
 		add_settings_field( 'beltoft_hardening_public_login_url', __( 'Public sign-in address', 'beltoft-hardening' ), array( __CLASS__, 'public_url_field' ), self::PAGE, 'beltoft_hardening_main' );
 		add_settings_field( 'beltoft_hardening_allow_lostpassword', __( 'Lost-password screen', 'beltoft-hardening' ), array( __CLASS__, 'lostpassword_field' ), self::PAGE, 'beltoft_hardening_main' );
 
+		foreach ( array(
+			Settings::DISABLE_XMLRPC        => array( __( 'XML-RPC', 'beltoft-hardening' ), __( 'Disable XML-RPC (its methods check passwords without the login screen)', 'beltoft-hardening' ) ),
+			Settings::DISABLE_APP_PASSWORDS => array( __( 'Application passwords', 'beltoft-hardening' ), __( 'Disable application passwords (REST accepts them as HTTP Basic passwords)', 'beltoft-hardening' ) ),
+		) as $key => $labels ) {
+			add_settings_field( 'beltoft_hardening_' . $key, $labels[0], array( __CLASS__, 'extra_checkbox' ), self::PAGE, 'beltoft_hardening_main', array( 'key' => $key, 'desc' => $labels[1] ) );
+		}
+
 		add_settings_field(
 			'beltoft_hardening_message',
 			__( 'Login error text', 'beltoft-hardening' ),
@@ -130,6 +137,21 @@ final class SettingsPage {
 			esc_attr( Settings::OPTION ),
 			esc_attr( $args['key'] ),
 			checked( Settings::enabled( $args['key'] ), true, false ),
+			esc_html( $args['desc'] )
+		);
+	}
+
+	/**
+	 * A default-off checkbox.
+	 *
+	 * @param array<string,string> $args Field arguments.
+	 */
+	public static function extra_checkbox( array $args ): void {
+		printf(
+			'<label><input type="checkbox" name="%1$s[%2$s]" value="1" %3$s /> %4$s</label>',
+			esc_attr( Settings::OPTION ),
+			esc_attr( $args['key'] ),
+			checked( Settings::extra_enabled( $args['key'] ), true, false ),
 			esc_html( $args['desc'] )
 		);
 	}

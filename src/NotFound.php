@@ -37,6 +37,22 @@ final class NotFound {
 	}
 
 	/**
+	 * Makes is_admin() false for everything that runs from here on (WP_ADMIN is a constant, but the current screen
+	 * overrides it, as set_current_screen( 'front' ) does).
+	 */
+	public static function front_screen(): void {
+		if ( ! function_exists( 'get_current_screen' ) && file_exists( ABSPATH . 'wp-admin/includes/screen.php' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/screen.php';
+		}
+		if ( ! class_exists( 'WP_Screen' ) && file_exists( ABSPATH . 'wp-admin/includes/class-wp-screen.php' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/class-wp-screen.php';
+		}
+		if ( class_exists( 'WP_Screen' ) && ( ( defined( 'WP_ADMIN' ) && WP_ADMIN ) || is_admin() ) ) {
+			$GLOBALS['current_screen'] = \WP_Screen::get( 'front' );
+		}
+	}
+
+	/**
 	 * Sends the 404 and ends the request.
 	 */
 	public static function send(): void {
@@ -44,12 +60,10 @@ final class NotFound {
 
 		// A wp-admin request is answered as the front end would answer it: the theme and its plugins must not see
 		// is_admin() (WP_ADMIN is a constant, but the current screen overrides it, as set_current_screen( 'front' ) does).
-		if ( is_admin() ) {
-			if ( ! class_exists( 'WP_Screen' ) ) {
-				require_once ABSPATH . 'wp-admin/includes/class-wp-screen.php';
-			}
-			$GLOBALS['current_screen'] = \WP_Screen::get( 'front' );
-		}
+		self::front_screen();
+
+		// WordPress turns /login, /admin and /wp-admin on a 404 into a redirect to the login: not for this answer.
+		remove_action( 'template_redirect', 'wp_redirect_admin_locations', 1000 );
 
 		if ( $wp instanceof \WP && $wp_query instanceof \WP_Query ) {
 			$wp->query_vars     = array( 'error' => '404' );

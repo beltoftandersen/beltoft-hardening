@@ -12,7 +12,7 @@ Hides administrator login names from user routes, oEmbed and REST, makes login e
 
 == Description ==
 
-Six small controls, each a checkbox under Settings > Hardening. The first five are on by default; the sixth is off until you switch it on:
+Eight small controls, each a checkbox under Settings > Hardening. The first five are on by default; the last three are off until you switch them on:
 
 * **REST user routes**: `/wp/v2/users` is hidden from everyone who cannot list users.
 * **Author archives**: `/?author=1` and author archives answer 404 on the front end.
@@ -22,9 +22,11 @@ Six small controls, each a checkbox under Settings > Hardening. The first five a
 
 * **Hide the login** (off by default): a visitor who is not signed in gets a 404 for wp-login.php and wp-admin. Staff sign in through a staff sign-in address you choose.
 
+* **XML-RPC** and **Application passwords** (both off by default): switch off the two other password endpoints that bypass the login screen.
+
 An optional text field replaces the default message "Incorrect username or password.".
 
-It complements rate limiting, fail2ban and two-factor authentication. Hiding the login is not a secret: the staff sign-in address is guessable, so it is not a substitute for any of those. What it gives is no login form and no password endpoint for the public, and less noise in the logs.
+It complements rate limiting, fail2ban and two-factor authentication. Hiding the login is not a secret: the staff sign-in address is guessable, so it is not a substitute for any of those. What it gives is no wp-login.php login form and no wp-login.php password endpoint for the public, and less noise in the logs. Other password endpoints remain (see the FAQ).
 
 == Installation ==
 
@@ -45,11 +47,43 @@ Switch it on under Settings > Hardening after choosing a staff sign-in address, 
 * WP-CLI, cron, REST, XML-RPC and everything for signed-in users.
 * `wp-admin/install.php`, `wp-admin/upgrade.php`, `load-styles.php` and `load-scripts.php` cannot be reached by a plugin (WordPress loads no plugins there, or does not load WordPress at all), so they behave as before; `install.php` and `upgrade.php` refuse by themselves on an installed, up-to-date site.
 
-The plain login form and the password POST are never public, whatever action name is sent with them.
+The plain login form and the password POST are never public, whatever action name is sent with them: actions are compared exactly as wp-login.php compares them (case-sensitive), a request carrying `log` or `pwd` is never public, the two-factor actions need their plugin's handler and markers (WP 2FA reads them from the body for `validate_2fa`, from the query string for `backup_2fa`), logout needs its nonce, recovery mode needs its token and key, and as a last line of defence the login form is never drawn for a visitor without the cookie. After a logout the visitor goes to the public sign-in address; an expired reset link goes to the lost-password page that works.
+
+= What does hiding the login NOT close? =
+
+* The shop's own login form (WooCommerce My Account) is a password endpoint by design.
+* XML-RPC (`xmlrpc.php`, for example `wp.getUsersBlogs`) checks usernames and passwords. Use the control "XML-RPC" (off by default) or block it at the web server.
+* REST accepts HTTP Basic authentication with an application password. Use the control "Application passwords" (off by default) if you do not use them. WordPress offers them over https only.
+* Still detectable by a determined visitor: `admin-ajax.php` (answers 400 "0"), `/wp-admin/css/*` and other static files, `load-styles.php`, `load-scripts.php`, `install.php`, `upgrade.php` and `maint/repair.php` (WordPress loads no plugins there), the web server's own `/wp-admin` to `/wp-admin/` redirect, `wp-activate.php` (redirects to the registration address; with the login hidden that is the public sign-in address), `?action=rp` with a key (answers with a redirect that names wp-login.php, which the reset email names too).
+* The 404 is built through the theme. On the test site (WooCommerce, WP 2FA, OpenID Connect in automatic mode, block theme) it was byte-identical to the 404 of a missing page for wp-login.php and wp-admin. A plugin that decides by `is_admin()` before this plugin's file loads (one that sorts before `beltoft-hardening` in the plugins folder, or a must-use plugin) can still make the wp-admin 404 differ; `WP_ADMIN` is a constant and cannot be undone by a plugin.
+
+The web server does all of this better, before PHP runs. nginx: put the two maps in `http {}` and the `if` in the `server {}` block, above the PHP location (tested with `nginx -t` and with requests on a scratch server):
+
+    # In the http {} block: is there a WordPress login cookie or the entry cookie?
+    map $http_cookie $beltoft_staff {
+        default 0;
+        "~(?:^|;\s*)(?:wordpress_logged_in_[^=]+|beltoft_hardening_entry)=" 1;
+    }
+    
+    # 1 = answer 404. wp-login.php without an action, key or checkemail (the login form and the password POST), and
+    # every wp-admin script except admin-ajax.php and admin-post.php.
+    map "$beltoft_staff|$uri|$arg_action|$arg_key|$arg_checkemail" $beltoft_hide {
+        default 0;
+        "~^0\|/wp-login\.php\|\|\|$" 1;
+        "~^0\|/wp-admin/(?!(?:admin-ajax|admin-post)\.php\|)(?:[^|]*\.php)?\|" 1;
+    }
+
+    if ( $beltoft_hide ) { return 404; }
+
+It answers 404 for the login form and the password POST (wp-login.php without `action`, `key` or `checkemail` in the query string; the two-factor and password-protected-post forms post to a URL that has one) and for every wp-admin script except `admin-ajax.php` and `admin-post.php`, unless the browser sends a `wordpress_logged_in_` cookie or the entry cookie (the plugin still checks that they are genuine). `return 404;` gives nginx's own 404 page; use `error_page 404 /index.php?error=404;` for WordPress's. Apache needs the same conditions in mod_rewrite rules; they are not tested here.
 
 = Does it work with single sign-on plugins? =
 
-Yes. With the cookie, a GET of wp-login.php reaches the SSO plugin as usual and the return through admin-ajax.php is untouched. Without the cookie the request is answered with the 404 before the plugin can redirect to the identity provider: the control runs first on `init`, and any redirect another plugin attempts while a 404 is pending becomes the 404. In that one case the 404 page is sent before later `init` callbacks have run, so a theme that depends on them may look plainer. SSO "button" mode does not have this.
+Yes. With the cookie, a GET of wp-login.php reaches the SSO plugin as usual (tested with OpenID Connect Generic in automatic mode) and the return through admin-ajax.php is untouched. Without the cookie the request is answered with the 404 before the plugin can redirect to the identity provider: the control runs first on `init`, marks the request as a front-end one (`$pagenow` becomes index.php, so plugins that load by it behave as on the front end) and any redirect another plugin attempts while a 404 is pending becomes the 404.
+
+= What about the login window that appears when a session expires? =
+
+For staff the window opens the staff sign-in address, which renews the cookie and carries on to the login. The cookie is renewed while a staff user (capability `edit_posts`, filter `beltoft_hardening_staff_capability`) uses the admin. Customers never receive it.
 
 = I am locked out of the admin. =
 
@@ -81,13 +115,15 @@ The oEmbed reply includes the author's name and the URL of the author archive, w
 
 = Can I change which accounts count as administrators? =
 
-Yes, with the `beltoft_hardening_admin_capability` filter (default `manage_options`). Other filters: `beltoft_hardening_author_details_capability`, `beltoft_hardening_hidden_rest_routes`, `beltoft_hardening_block_author_request`, `beltoft_hardening_credential_error_codes`, `beltoft_hardening_generic_message`, `beltoft_hardening_admin_login_allowed`, and for the hidden login `beltoft_hardening_public_login_actions`, `beltoft_hardening_two_factor_actions`, `beltoft_hardening_public_login_url`, `beltoft_hardening_public_admin_pages` and `beltoft_hardening_entry_lifetime`.
+Yes, with the `beltoft_hardening_admin_capability` filter (default `manage_options`). Other filters: `beltoft_hardening_author_details_capability`, `beltoft_hardening_hidden_rest_routes`, `beltoft_hardening_block_author_request`, `beltoft_hardening_credential_error_codes`, `beltoft_hardening_generic_message`, `beltoft_hardening_admin_login_allowed`, and for the hidden login `beltoft_hardening_public_login_actions`, `beltoft_hardening_two_factor_actions`, `beltoft_hardening_public_login_url`, `beltoft_hardening_public_admin_pages`, `beltoft_hardening_entry_lifetime`, `beltoft_hardening_staff_capability` and `beltoft_hardening_recovery_mode_active`.
 
 == Changelog ==
 
 = 1.3.0 =
 * New optional control: hide the login. A visitor who is not signed in gets the theme's 404 for wp-login.php and wp-admin. Staff sign in through a staff sign-in address that sets a signed 15-minute cookie. Password resets, logout, password-protected posts, privacy confirmations, the known two-factor second steps (WP 2FA), admin-ajax.php and admin-post.php stay reachable. Off by default; cannot be switched on without an address; off whatever the setting when `BELTOFT_HARDENING_DISABLE_HIDE_LOGIN` is defined; not supported on multisite.
 * New settings: staff sign-in address, public sign-in address, lost-password screen. New filters listed above.
+* Two more optional controls, off by default: disable XML-RPC, disable application passwords.
+* The staff address cannot be an existing page, WooCommerce page, rewrite rule or endpoint, the public sign-in page, `feed`, or a language-like prefix.
 
 = 1.2.0 =
 * New control: hide author details from oEmbed and the public REST API. The oEmbed author name and URL and the REST author field and link are removed for anyone who cannot edit posts. On by default. Filter `beltoft_hardening_author_details_capability`.

@@ -108,12 +108,11 @@ final class HideLoginRequestsTest extends HideLoginTestCase {
 
 	public function test_public_actions_pass_without_cookie(): void {
 		$this->enable( array( Settings::ALLOW_LOSTPASSWORD => '0' ) );
-		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'logout', '_wpnonce' => 'x' ) ) );
+		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'logout', '_wpnonce' => wp_create_nonce( 'log-out' ) ) ) );
 		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'postpass' ), array( 'post_password' => 'x' ), 'POST' ) );
 		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'rp', 'key' => 'k', 'login' => 'u' ) ) );
 		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'resetpass' ), array( 'pass1' => 'x', 'rp_key' => 'k' ), 'POST' ) );
 		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'confirmaction', 'request_id' => '1', 'confirm_key' => 'k' ) ) );
-		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'password-reset' => 'true' ) ) );
 	}
 
 	public function test_lostpassword_follows_the_setting(): void {
@@ -134,10 +133,12 @@ final class HideLoginRequestsTest extends HideLoginTestCase {
 		$this->assertTrue( Settings::allow_lostpassword() );
 	}
 
-	public function test_expired_reset_link_may_land_on_the_lostpassword_error(): void {
+	public function test_expired_reset_link_is_sent_to_the_working_lostpassword_page(): void {
 		$this->enable( array( Settings::ALLOW_LOSTPASSWORD => '0' ) );
-		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'lostpassword', 'error' => 'invalidkey' ) ) );
-		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'lostpassword', 'error' => 'expiredkey' ) ) );
+		$this->assertSame( 'redirect', $this->request( 'wp-login.php', array( 'action' => 'lostpassword', 'error' => 'invalidkey' ) ) );
+		$this->assertSame( wp_lostpassword_url(), $this->seen['location'] );
+		$this->assertSame( 'redirect', $this->request( 'wp-login.php', array( 'action' => 'lostpassword', 'error' => 'expiredkey' ) ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'lostpassword', 'error' => 'invalidkey' ), array( 'user_login' => 'a' ), 'POST' ), 'a POST is no landing' );
 		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'lostpassword', 'error' => 'other' ) ) );
 	}
 
@@ -149,20 +150,46 @@ final class HideLoginRequestsTest extends HideLoginTestCase {
 		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => array( 'logout' ) ) ) );
 	}
 
+	private function with_2fa_handlers(): void {
+		add_action( 'login_form_validate_2fa', '__return_null' );
+		add_action( 'login_form_backup_2fa', '__return_null' );
+	}
+
 	public function test_two_factor_defaults_pass_with_their_markers_only(): void {
 		$this->enable();
+		$this->with_2fa_handlers();
 		$marks = array( 'wp-auth-id' => '5', 'wp-auth-nonce' => 'abc' );
 
-		foreach ( array( 'validate_2fa', 'grace_2fa' ) as $action ) {
-			$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => $action ), $marks, 'POST' ), $action );
-			$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => $action ) ), $action . ' bare' );
-		}
+		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), $marks, 'POST' ) );
+		// The markers are read from the body for validate_2fa: in the query string they do not count.
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ) + $marks ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ) ) );
+		// One marker, an empty one or an array one is not enough.
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), array( 'wp-auth-id' => '5' ), 'POST' ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), array( 'wp-auth-nonce' => 'abc' ), 'POST' ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), array( 'wp-auth-id' => '5', 'wp-auth-nonce' => '' ), 'POST' ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), array( 'wp-auth-id' => '5', 'wp-auth-nonce' => array( 'x' ) ), 'POST' ) );
+
+		// backup_2fa is a GET with a provider.
 		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'backup_2fa', 'provider' => 'totp' ) + $marks ) );
-		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'backup_2fa', 'wp-auth-id' => '5' ) ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'backup_2fa' ) + $marks ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'backup_2fa', 'wp-auth-id' => '5', 'provider' => 'totp' ) ) );
+	}
+
+	public function test_two_factor_actions_need_a_registered_handler(): void {
+		$this->enable();
+		$marks = array( 'wp-auth-id' => '5', 'wp-auth-nonce' => 'abc' );
+		// WP 2FA not active: nothing handles the action, WordPress would draw the login form.
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), $marks, 'POST' ) );
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'backup_2fa', 'provider' => 'totp' ) + $marks ) );
+		// grace_2fa has no wp-login.php handler in WP 2FA.
+		$this->with_2fa_handlers();
+		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'grace_2fa' ), $marks, 'POST' ) );
 	}
 
 	public function test_a_two_factor_action_is_no_back_door_for_the_password(): void {
 		$this->enable();
+		add_action( 'login_form_validate_2fa', '__return_null' );
 		$post = array( 'wp-auth-id' => '5', 'wp-auth-nonce' => 'abc', 'log' => 'admin', 'pwd' => 'guess' );
 		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'validate_2fa' ), $post, 'POST' ) );
 		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'rp', 'key' => 'k' ), array( 'log' => 'a', 'pwd' => 'b' ), 'POST' ) );
@@ -170,6 +197,7 @@ final class HideLoginRequestsTest extends HideLoginTestCase {
 
 	public function test_two_factor_list_and_allowlist_are_filterable(): void {
 		$this->enable();
+		add_action( 'login_form_other_2fa', '__return_null' );
 		add_filter( 'beltoft_hardening_two_factor_actions', static fn( $l ) => $l + array( 'other_2fa' => array( 'token' ) ) );
 		$this->assertSame( 'pass', $this->request( 'wp-login.php', array( 'action' => 'other_2fa', 'token' => 'x' ) ) );
 		$this->assertSame( '404', $this->request( 'wp-login.php', array( 'action' => 'other_2fa' ) ) );
